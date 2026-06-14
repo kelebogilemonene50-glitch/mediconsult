@@ -746,8 +746,7 @@
     border-radius: 8px; font-size: 11px;
     color: var(--accent-light); text-align: center;
   }
-  </style>
-
+</style>
 </head>
 <body>
 
@@ -1251,8 +1250,12 @@ function toggleAvailability() {
   document.getElementById('avail-hint').textContent = on
     ? 'Patients can now request consultations with you'
     : "You're currently offline";
+  // Tell the server to add or remove this doctor from the visible list
+  socket.emit('set-availability', { available: on });
   if (on) {
-    toast('You are now available for consultations.', 'success');
+    toast('You are now visible to patients.', 'success');
+  } else {
+    toast('You are now offline.', 'warning');
   }
 }
 

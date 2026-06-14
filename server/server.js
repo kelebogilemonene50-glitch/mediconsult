@@ -39,14 +39,45 @@ io.on('connection', (socket) => {
     socket.data.role = role;
     socket.data.name = name;
     socket.data.speciality = speciality || null;
+    socket.data.available = false; // doctors start as unavailable
 
     if (role === 'doctor') {
-      waitingRoom.doctors.push({ id: socket.id, name, speciality });
-      io.emit('doctors-updated', waitingRoom.doctors);
-      console.log(`Doctor registered: ${name}`);
-    } else {
-      io.emit('doctors-updated', waitingRoom.doctors);
+      console.log(`Doctor registered: ${name} (offline until they toggle on)`);
     }
+    // Always send current available doctors list to the newly connected user
+    const availableDoctors = waitingRoom.doctors.filter(d => d.available);
+    socket.emit('doctors-updated', availableDoctors);
+  });
+
+  // Doctor toggles their availability on or off
+  socket.on('set-availability', ({ available }) => {
+    if (socket.data.role !== 'doctor') return;
+    socket.data.available = available;
+
+    // Update or remove from the doctors list
+    if (available) {
+      // Add to list if not already there
+      const exists = waitingRoom.doctors.find(d => d.id === socket.id);
+      if (!exists) {
+        waitingRoom.doctors.push({
+          id: socket.id,
+          name: socket.data.name,
+          speciality: socket.data.speciality,
+          available: true
+        });
+      } else {
+        exists.available = true;
+      }
+    } else {
+      // Mark as unavailable
+      const doc = waitingRoom.doctors.find(d => d.id === socket.id);
+      if (doc) doc.available = false;
+    }
+
+    // Broadcast only available doctors to everyone
+    const availableDoctors = waitingRoom.doctors.filter(d => d.available);
+    io.emit('doctors-updated', availableDoctors);
+    console.log(`Doctor ${socket.data.name} is now ${available ? 'AVAILABLE' : 'OFFLINE'}`);
   });
 
   socket.on('submit-medical-record', ({ record }) => {
@@ -207,7 +238,8 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     if (socket.data.role === 'doctor') {
       waitingRoom.doctors = waitingRoom.doctors.filter(d => d.id !== socket.id);
-      io.emit('doctors-updated', waitingRoom.doctors);
+      const availableDoctors = waitingRoom.doctors.filter(d => d.available);
+      io.emit('doctors-updated', availableDoctors);
     }
     if (socket.data.roomId) {
       socket.to(socket.data.roomId).emit('peer-disconnected', { name: socket.data.name });
