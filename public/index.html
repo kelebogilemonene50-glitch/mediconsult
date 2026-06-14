@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MediConsult — Virtual Consultation</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #1a8a6b;
+    --accent-light: #23b98e;
+    --accent-bg: rgba(26,138,107,0.12);
+    --danger: #da3633;
+    --warning: #d29922;
+    --blue: #1f6feb;
+    --radius: 10px;
+    --font: 'Inter', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-icon svg { width: 18px; height: 18px; fill: #fff; }
+  .status-bar {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--muted);
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted);
+  }
+  .dot.online { background: var(--accent-light); box-shadow: 0 0 0 2px var(--accent-bg); }
+
+  /* ── Pages ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Login / Registration ── */
+  .auth-wrap {
+    min-height: calc(100vh - 65px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 20px;
+  }
+  .auth-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 36px;
+    width: 100%; max-width: 440px;
+  }
+  .auth-card h2 {
+    font-size: 22px; font-weight: 600; margin-bottom: 6px;
+  }
+  .auth-card p.sub {
+    color: var(--muted); margin-bottom: 28px; font-size: 13px;
+  }
+  .role-tabs {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; margin-bottom: 24px;
+  }
+  .role-tab {
+    padding: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer; text-align: center;
+    font-size: 13px; color: var(--muted);
+    transition: all 0.15s;
+  }
+  .role-tab.active {
+    background: var(--accent-bg);
+    border-color: var(--accent);
+    color: var(--accent-light);
+  }
+  .role-tab span { display: block; font-size: 20px; margin-bottom: 4px; }
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block; font-size: 12px;
+    color: var(--muted); margin-bottom: 6px; font-weight: 500;
+  }
+  .field input, .field select {
+    width: 100%; padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text); font-size: 14px;
+    outline: none; transition: border 0.15s;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+  }
+  .field select option { background: var(--surface2); }
+  .btn {
+    width: 100%; padding: 11px;
+    border-radius: var(--radius);
+    border: none; cursor: pointer;
+    font-size: 14px; font-weight: 500;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--accent-light); }
+  .btn-danger {
+    background: rgba(218,54,51,0.15);
+    color: var(--danger);
+    border: 1px solid rgba(218,54,51,0.3);
+  }
+  .btn-danger:hover { background: rgba(218,54,51,0.25); }
+  .btn-ghost {
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+  /* ── Patient lobby ── */
+  .lobby {
+    max-width: 960px; margin: 0 auto;
+    padding: 32px 24px;
+  }
+  .lobby h2 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .lobby .sub { color: var(--muted); margin-bottom: 28px; }
+
+  .symptom-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .symptom-box h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+  .symptom-box textarea {
+    width: 100%; min-height: 80px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text); font-size: 14px;
+    padding: 10px 14px; resize: vertical;
+    outline: none; font-family: var(--font);
+    transition: border 0.15s;
+  }
+  .symptom-box textarea:focus { border-color: var(--accent); }
+
+  .section-label {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--muted); margin-bottom: 12px;
+  }
+  .doctor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+  }
+  .doctor-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    cursor: pointer;
+    transition: border 0.15s, transform 0.1s;
+  }
+  .doctor-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .doctor-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+  }
+  .doc-head {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
+  }
+  .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 600; color: #fff;
+    flex-shrink: 0;
+  }
+  .doc-info .name { font-weight: 600; font-size: 14px; }
+  .doc-info .spec { font-size: 12px; color: var(--accent-light); margin-top: 2px; }
+  .avail-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--accent-light);
+    background: var(--accent-bg);
+    padding: 3px 8px; border-radius: 20px;
+  }
+  .avail-badge::before {
+    content: '';
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent-light);
+  }
+  .empty-state {
+    text-align: center; padding: 48px 24px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+  }
+  .empty-state .icon { font-size: 36px; margin-bottom: 12px; }
+  .empty-state p { font-size: 13px; }
+
+  .request-bar {
+    margin-top: 20px;
+    display: flex; gap: 10px; align-items: center;
+  }
+  #selected-doctor-name {
+    flex: 1; font-size: 13px; color: var(--muted);
+  }
+
+  /* ── Doctor lobby ── */
+  .doc-lobby {
+    max-width: 700px; margin: 0 auto; padding: 32px 24px;
+  }
+  .doc-lobby h2 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .doc-lobby .sub { color: var(--muted); margin-bottom: 28px; }
+  .availability-toggle {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .toggle-info .label { font-weight: 600; font-size: 14px; }
+  .toggle-info .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .toggle-switch {
+    position: relative; width: 44px; height: 24px;
+    cursor: pointer;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0;
+    background: var(--border);
+    border-radius: 24px;
+    transition: 0.2s;
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute;
+    width: 18px; height: 18px; left: 3px; bottom: 3px;
+    background: #fff; border-radius: 50%;
+    transition: 0.2s;
+  }
+  .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
+  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+  .queue-section { margin-top: 24px; }
+  .queue-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .queue-item .patient-info { flex: 1; }
+  .queue-item .p-name { font-weight: 600; font-size: 14px; }
+  .queue-item .symptoms { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .queue-actions { display: flex; gap: 8px; }
+  .btn-sm {
+    padding: 7px 14px;
+    border-radius: 7px;
+    border: none; cursor: pointer;
+    font-size: 12px; font-weight: 500;
+    transition: all 0.15s;
+  }
+  .btn-sm.accept {
+    background: var(--accent); color: #fff;
+  }
+  .btn-sm.accept:hover { background: var(--accent-light); }
+  .btn-sm.decline {
+    background: rgba(218,54,51,0.12);
+    color: var(--danger);
+    border: 1px solid rgba(218,54,51,0.25);
+  }
+  .btn-sm.decline:hover { background: rgba(218,54,51,0.2); }
+
+  /* ── Consultation room ── */
+  .consult-room {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    height: calc(100vh - 65px);
+  }
+
+  /* Video area */
+  .video-area {
+    background: #000;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  #remote-video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  #local-video {
+    position: absolute;
+    bottom: 20px; right: 20px;
+    width: 200px; height: 140px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 2px solid var(--accent);
+    background: #111;
+    z-index: 10;
+  }
+  .video-placeholder {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px; color: var(--muted);
+    position: absolute; inset: 0;
+  }
+  .video-placeholder .big-avatar {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; font-weight: 600; color: var(--muted);
+  }
+  .video-placeholder p { font-size: 14px; }
+
+  .controls-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 20px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    z-index: 20;
+  }
+  .ctrl-btn {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; font-size: 20px;
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+  }
+  .ctrl-btn:hover { background: rgba(255,255,255,0.22); transform: scale(1.05); }
+  .ctrl-btn.active { background: var(--accent); }
+  .ctrl-btn.end-call {
+    background: var(--danger); width: 54px; height: 54px; font-size: 22px;
+  }
+  .ctrl-btn.end-call:hover { background: #b02a28; }
+  .ctrl-btn svg { width: 22px; height: 22px; fill: currentColor; }
+
+  .call-timer {
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.55);
+    color: var(--accent-light);
+    padding: 5px 14px; border-radius: 20px;
+    font-size: 13px; font-weight: 600; font-family: monospace;
+    z-index: 20;
+  }
+
+  /* Side panel */
+  .side-panel {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+  .side-header {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .peer-info {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .peer-info .avatar { width: 36px; height: 36px; font-size: 13px; }
+  .peer-info .name { font-weight: 600; font-size: 14px; }
+  .peer-info .role-badge {
+    font-size: 10px; color: var(--accent-light);
+    background: var(--accent-bg);
+    padding: 2px 7px; border-radius: 20px;
+    margin-top: 2px; display: inline-block;
+  }
+
+  /* Shared notes */
+  .notes-section {
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    max-height: 260px;
+  }
+  .notes-header {
+    padding: 10px 18px 0;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.7px;
+    color: var(--muted);
+  }
+  .notes-feed {
+    flex: 1; overflow-y: auto;
+    padding: 10px 18px;
+    display: flex; flex-direction: column; gap: 8px;
+    min-height: 60px;
+  }
+  .notes-feed::-webkit-scrollbar { width: 4px; }
+  .notes-feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .note-item {
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px; line-height: 1.5;
+    border-left: 3px solid var(--accent);
+    background: var(--surface2);
+  }
+  .note-item.from-doctor { border-left-color: var(--blue); }
+  .note-item.from-patient { border-left-color: var(--accent); }
+  .note-meta {
+    font-size: 10px; color: var(--muted);
+    margin-bottom: 3px; font-weight: 600;
+  }
+  .note-text { color: var(--text); word-break: break-word; }
+  .notes-input-row {
+    padding: 8px 18px 12px;
+    display: flex; gap: 8px;
+  }
+  #note-input {
+    flex: 1; padding: 8px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text); font-size: 12px;
+    outline: none; font-family: var(--font);
+  }
+  #note-input:focus { border-color: var(--accent); }
+  .note-send-btn {
+    padding: 8px 12px;
+    background: var(--accent);
+    color: #fff; border: none;
+    border-radius: var(--radius);
+    cursor: pointer; font-size: 12px;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .note-send-btn:hover { background: var(--accent-light); }
+
+  /* Chat */
+  .chat-section {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .chat-label {
+    padding: 10px 18px;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.7px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .chat-messages {
+    flex: 1; overflow-y: auto;
+    padding: 14px 18px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-track { background: transparent; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .chat-msg {
+    max-width: 100%;
+  }
+  .chat-msg .msg-meta {
+    font-size: 10px; color: var(--muted); margin-bottom: 3px;
+    display: flex; gap: 6px; align-items: center;
+  }
+  .chat-msg .msg-meta .sender { font-weight: 600; color: var(--text); }
+  .chat-msg .bubble {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px; line-height: 1.5;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    word-break: break-word;
+  }
+  .chat-msg.mine .bubble {
+    background: var(--accent-bg);
+    border-color: rgba(26,138,107,0.3);
+  }
+  .chat-input-row {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px;
+  }
+  #chat-input {
+    flex: 1; padding: 9px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text); font-size: 13px;
+    outline: none; font-family: var(--font);
+  }
+  #chat-input:focus { border-color: var(--accent); }
+  .send-btn {
+    padding: 9px 14px;
+    background: var(--accent);
+    color: #fff; border: none;
+    border-radius: var(--radius);
+    cursor: pointer; font-size: 13px;
+    transition: background 0.15s;
+  }
+  .send-btn:hover { background: var(--accent-light); }
+
+  /* ── Toast notifications ── */
+  #toast-container {
+    position: fixed; top: 80px; right: 20px;
+    display: flex; flex-direction: column; gap: 8px;
+    z-index: 9999; pointer-events: none;
+  }
+  .toast {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px; max-width: 300px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    animation: slideIn 0.2s ease;
+    pointer-events: all;
+  }
+  .toast.success { border-color: var(--accent); }
+  .toast.error { border-color: var(--danger); }
+  .toast.warning { border-color: var(--warning); }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ── Waiting overlay ── */
+  .waiting-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: none; align-items: center; justify-content: center;
+    z-index: 999;
+  }
+  .waiting-overlay.active { display: flex; }
+  .waiting-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 36px; text-align: center;
+    max-width: 360px; width: 90%;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .waiting-card h3 { font-size: 16px; margin-bottom: 8px; }
+  .waiting-card p { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+
+  /* ── Incoming call overlay (for doctor) ── */
+  #incoming-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: none; align-items: center; justify-content: center;
+    z-index: 998;
+  }
+  #incoming-overlay.active { display: flex; }
+  .incoming-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px; text-align: center;
+    max-width: 360px; width: 90%;
+  }
+  .ring-animation {
+    width: 60px; height: 60px; border-radius: 50%;
+    background: var(--accent-bg);
+    border: 2px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    animation: ring 1s ease infinite;
+    font-size: 24px;
+  }
+  @keyframes ring {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+  .incoming-card h3 { font-size: 17px; margin-bottom: 6px; }
+  .incoming-card .symptoms-preview {
+    font-size: 12px; color: var(--muted);
+    background: var(--surface2);
+    border-radius: 8px; padding: 10px 12px;
+    margin: 12px 0 20px; text-align: left;
+  }
+  .symptoms-preview strong { color: var(--text); display: block; margin-bottom: 4px; }
+  .incoming-actions { display: flex; gap: 10px; }
+  .incoming-actions button {
+    flex: 1; padding: 11px;
+    border-radius: var(--radius);
+    border: none; cursor: pointer;
+    font-size: 13px; font-weight: 500;
+  }
+  .btn-accept { background: var(--accent); color: #fff; }
+  .btn-accept:hover { background: var(--accent-light); }
+  .btn-decline { background: rgba(218,54,51,0.15); color: var(--danger); border: 1px solid rgba(218,54,51,0.3) !important; }
+  .btn-decline:hover { background: rgba(218,54,51,0.25); }
+
+  /* ── Responsive ── */
+  @media (max-width: 700px) {
+    .consult-room { grid-template-columns: 1fr; grid-template-rows: 1fr 280px; }
+    .side-panel { border-left: none; border-top: 1px solid var(--border); }
+    #local-video { width: 100px; height: 72px; }
+  }
+
+  /* ── Medical record button in side header ── */
+  .record-btn {
+    margin-top: 10px;
+    width: 100%; padding: 8px;
+    background: rgba(31,111,235,0.12);
+    color: #5b9cf6;
+    border: 1px solid rgba(31,111,235,0.3);
+    border-radius: var(--radius);
+    cursor: pointer; font-size: 12px; font-weight: 500;
+    transition: all 0.15s; display: none;
+  }
+  .record-btn:hover { background: rgba(31,111,235,0.22); }
+
+  /* ── Medical record modal ── */
+  #record-modal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: none; align-items: center; justify-content: center;
+    z-index: 9000; padding: 20px;
+  }
+  #record-modal.active { display: flex; }
+  .record-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: 100%; max-width: 560px;
+    max-height: 85vh; overflow-y: auto;
+  }
+  .record-card::-webkit-scrollbar { width: 4px; }
+  .record-card::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .record-top {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--surface); z-index: 1;
+  }
+  .record-top h3 { font-size: 16px; font-weight: 600; }
+  .record-close {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    cursor: pointer; font-size: 16px; color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .record-close:hover { color: var(--text); }
+  .record-body { padding: 20px 24px; }
+  .record-patient-head {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 20px;
+    padding: 16px;
+    background: var(--surface2);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .record-avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--blue);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 600; color: #fff;
+    flex-shrink: 0;
+  }
+  .record-patient-info .r-name { font-size: 17px; font-weight: 600; }
+  .record-patient-info .r-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .record-confidential {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 600;
+    color: var(--danger); background: rgba(218,54,51,0.1);
+    border: 1px solid rgba(218,54,51,0.25);
+    padding: 2px 8px; border-radius: 20px;
+    margin-top: 4px;
+  }
+  .record-section { margin-bottom: 20px; }
+  .record-section-title {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--muted); margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .record-row {
+    display: flex; justify-content: space-between;
+    align-items: flex-start;
+    padding: 6px 0;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .record-row:last-child { border-bottom: none; }
+  .record-row .r-label { color: var(--muted); flex-shrink: 0; margin-right: 12px; }
+  .record-row .r-value { color: var(--text); text-align: right; font-weight: 500; }
+  .record-row .r-value.danger { color: var(--danger); }
+  .record-row .r-value.warning { color: var(--warning); }
+  .record-tag {
+    display: inline-block;
+    padding: 2px 8px; border-radius: 20px;
+    font-size: 11px; font-weight: 500;
+    margin: 2px;
+  }
+  .tag-red { background: rgba(218,54,51,0.15); color: #f07070; }
+  .tag-blue { background: rgba(31,111,235,0.15); color: #5b9cf6; }
+  .tag-amber { background: rgba(210,153,34,0.15); color: #e6b84a; }
+  .tag-green { background: rgba(26,138,107,0.15); color: #23b98e; }
+  .access-notice {
+    margin-top: 16px; padding: 10px 14px;
+    background: rgba(26,138,107,0.08);
+    border: 1px solid rgba(26,138,107,0.2);
+    border-radius: 8px; font-size: 11px;
+    color: var(--accent-light); text-align: center;
+  }
+
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+    </div>
+    MediConsult
+  </div>
+  <div class="status-bar">
+    <div class="dot" id="conn-dot"></div>
+    <span id="conn-status">Connecting…</span>
+  </div>
+</header>
+
+<!-- ══ PAGE: Auth ══ -->
+<div class="page active" id="page-auth">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <h2>Welcome to MediConsult</h2>
+      <p class="sub">Real-time virtual consultations between patients and doctors.</p>
+
+      <div class="role-tabs">
+        <div class="role-tab active" id="tab-patient" onclick="selectRole('patient')">
+          <span>🧑‍⚕️</span> I'm a Patient
+        </div>
+        <div class="role-tab" id="tab-doctor" onclick="selectRole('doctor')">
+          <span>👨‍⚕️</span> I'm a Doctor
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" id="auth-name" placeholder="Enter your full name" />
+      </div>
+
+      <div class="field" id="speciality-field" style="display:none;">
+        <label>Speciality</label>
+        <select id="auth-speciality">
+          <option value="General Practitioner">General Practitioner</option>
+          <option value="Cardiologist">Cardiologist</option>
+          <option value="Dermatologist">Dermatologist</option>
+          <option value="Paediatrician">Paediatrician</option>
+          <option value="Neurologist">Neurologist</option>
+          <option value="Gynaecologist">Gynaecologist</option>
+          <option value="Orthopaedic Surgeon">Orthopaedic Surgeon</option>
+          <option value="Pulmonologist">Pulmonologist</option>
+          <option value="ENT Specialist">ENT Specialist</option>
+        </select>
+      </div>
+
+      <button class="btn btn-primary" onclick="joinSystem()">Join Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE: Patient Lobby ══ -->
+<div class="page" id="page-patient">
+  <div class="lobby">
+    <h2 id="patient-greeting">Good day, Patient</h2>
+    <p class="sub">Describe your symptoms and choose an available doctor to begin your consultation.</p>
+
+    <div class="symptom-box">
+      <h3>What brings you in today?</h3>
+      <textarea id="symptoms-input" placeholder="Describe your symptoms… e.g. I have a persistent cough, mild fever for 3 days, and difficulty breathing."></textarea>
+    </div>
+
+    <p class="section-label">Available Doctors</p>
+    <div class="doctor-grid" id="doctor-grid">
+      <div class="empty-state">
+        <div class="icon">🩺</div>
+        <p>No doctors are available right now.<br/>Please wait or check back shortly.</p>
+      </div>
+    </div>
+
+    <div class="request-bar">
+      <span id="selected-doctor-name">No doctor selected</span>
+      <button class="btn btn-primary" style="width:auto; padding:10px 24px;" onclick="requestConsultation()">
+        Request Consultation →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE: Doctor Lobby ══ -->
+<div class="page" id="page-doctor">
+  <div class="doc-lobby">
+    <h2 id="doctor-greeting">Doctor Dashboard</h2>
+    <p class="sub">Set yourself as available to receive patient consultation requests.</p>
+
+    <div class="availability-toggle">
+      <div class="toggle-info">
+        <div class="label">Available for consultations</div>
+        <div class="hint" id="avail-hint">You're currently offline</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="avail-toggle" onchange="toggleAvailability()" />
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <div class="queue-section">
+      <p class="section-label">Incoming Requests</p>
+      <div id="queue-list">
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          <p>No incoming requests yet.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE: Consultation Room ══ -->
+<div class="page" id="page-room">
+  <div class="consult-room">
+
+    <!-- Video -->
+    <div class="video-area">
+      <div class="video-placeholder" id="video-placeholder">
+        <div class="big-avatar" id="remote-avatar">?</div>
+        <p id="video-placeholder-text">Waiting for video connection…</p>
+      </div>
+      <video id="remote-video" autoplay playsinline style="display:none;"></video>
+      <video id="local-video" autoplay playsinline muted></video>
+
+      <div class="call-timer" id="call-timer">00:00</div>
+
+      <div class="controls-bar">
+        <button class="ctrl-btn active" id="mic-btn" onclick="toggleMic()" title="Toggle microphone">
+          <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"/></svg>
+        </button>
+        <button class="ctrl-btn active" id="cam-btn" onclick="toggleCam()" title="Toggle camera">
+          <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+        </button>
+        <button class="ctrl-btn end-call" onclick="endCall()" title="End consultation">
+          <svg viewBox="0 0 24 24"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+        </button>
+        <button class="ctrl-btn" id="screen-btn" onclick="toggleScreen()" title="Share screen">
+          <svg viewBox="0 0 24 24"><path d="M20 3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h3l-1 1v1h12v-1l-1-1h3c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13H4V5h16v11z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Side panel -->
+    <div class="side-panel">
+      <div class="side-header">
+        <div class="peer-info">
+          <div class="avatar" id="peer-avatar-side">?</div>
+          <div>
+            <div class="name" id="peer-name-side">Connecting…</div>
+            <span class="role-badge" id="peer-role-side">—</span>
+          </div>
+        </div>
+        <button class="record-btn" id="record-btn" onclick="requestMedicalRecord()">
+          🗂 View Patient Medical Record
+        </button>
+      </div>
+
+      <div class="notes-section">
+        <div class="notes-header" id="notes-label">📋 Consultation Notes</div>
+        <div class="notes-feed" id="notes-feed">
+          <div style="font-size:12px; color:var(--muted); text-align:center; padding:8px 0;">
+            Notes sent here are visible to both doctor and patient.
+          </div>
+        </div>
+        <div class="notes-input-row">
+          <input type="text" id="note-input" placeholder="Write a note and send…" onkeydown="noteKeydown(event)" />
+          <button class="note-send-btn" onclick="sendNote()">Send Note</button>
+        </div>
+      </div>
+
+      <div class="chat-section">
+        <div class="chat-label">💬 Live Chat</div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chat-input" placeholder="Type a message…" onkeydown="chatKeydown(event)" />
+          <button class="send-btn" onclick="sendChat()">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Waiting overlay -->
+<div class="waiting-overlay" id="waiting-overlay">
+  <div class="waiting-card">
+    <div class="spinner"></div>
+    <h3>Waiting for doctor…</h3>
+    <p>Your request has been sent. The doctor will accept shortly.</p>
+    <button class="btn btn-ghost" style="width:auto; padding:9px 20px;" onclick="cancelRequest()">Cancel</button>
+  </div>
+</div>
+
+<!-- Incoming call overlay (doctor) -->
+<div id="incoming-overlay">
+  <div class="incoming-card">
+    <div class="ring-animation">📞</div>
+    <h3>Incoming Patient</h3>
+    <p style="color:var(--muted);font-size:13px;" id="incoming-patient-name">Patient Name</p>
+    <div class="symptoms-preview">
+      <strong>Reported symptoms</strong>
+      <span id="incoming-symptoms">—</span>
+    </div>
+    <div class="incoming-actions">
+      <button class="btn-accept" onclick="acceptConsultation()">Accept</button>
+      <button class="btn-decline" onclick="declineConsultation()">Decline</button>
+    </div>
+  </div>
+</div>
+
+<!-- Medical record modal -->
+<div id="record-modal">
+  <div class="record-card">
+    <div class="record-top">
+      <h3>🗂 Patient Medical Record</h3>
+      <button class="record-close" onclick="closeRecordModal()">✕</button>
+    </div>
+    <div class="record-body" id="record-body">
+      <!-- filled dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+// ════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════
+let myRole = 'patient';
+let myName = '';
+let myId = '';
+let selectedDoctorId = null;
+let currentRoomId = null;
+let pendingPatientId = null;
+let pendingPatientName = '';
+let peerName = '';
+let currentPatientId = null;
+
+// WebRTC
+let localStream = null;
+let pc = null; // RTCPeerConnection
+let callTimerInterval = null;
+let callSeconds = 0;
+let micOn = true, camOn = true, screenSharing = false;
+let screenStream = null;
+
+// ════════════════════════════════════════════════
+//  SOCKET.IO — connect to the server
+//  Change this URL to your server's address!
+// ════════════════════════════════════════════════
+const SOCKET_URL = window.location.origin;
+const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+
+socket.on('connect', () => {
+  setConnStatus(true);
+  myId = socket.id;
+});
+socket.on('disconnect', () => setConnStatus(false));
+socket.on('connect_error', () => setConnStatus(false));
+
+// ════════════════════════════════════════════════
+//  SOCKET EVENTS
+// ════════════════════════════════════════════════
+socket.on('doctors-updated', (doctors) => {
+  renderDoctors(doctors);
+});
+
+socket.on('incoming-consultation', ({ patientId, patientName, symptoms }) => {
+  pendingPatientId = patientId;
+  pendingPatientName = patientName;
+  document.getElementById('incoming-patient-name').textContent = patientName;
+  document.getElementById('incoming-symptoms').textContent = symptoms || 'Not specified';
+  document.getElementById('incoming-overlay').classList.add('active');
+});
+
+socket.on('waiting-for-doctor', () => {
+  document.getElementById('waiting-overlay').classList.add('active');
+});
+
+socket.on('consultation-accepted', ({ roomId, doctorName }) => {
+  currentRoomId = roomId;
+  peerName = doctorName;
+  document.getElementById('waiting-overlay').classList.remove('active');
+  toast(`Dr. ${doctorName} accepted your request!`, 'success');
+  enterRoom(doctorName, 'Doctor');
+});
+
+socket.on('consultation-ready', ({ roomId }) => {
+  currentRoomId = roomId;
+  document.getElementById('incoming-overlay').classList.remove('active');
+  enterRoom(pendingPatientName, 'Patient');
+  // Doctor creates the offer
+  setTimeout(startCall, 600);
+});
+
+socket.on('consultation-declined', ({ doctorName }) => {
+  document.getElementById('waiting-overlay').classList.remove('active');
+  toast(`Dr. ${doctorName} is unavailable right now.`, 'error');
+});
+
+socket.on('webrtc-offer', async ({ offer }) => {
+  await ensurePeerConnection();
+  await pc.setRemoteDescription(new RTCSessionDescription(offer));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  socket.emit('webrtc-answer', { roomId: currentRoomId, answer });
+});
+
+socket.on('webrtc-answer', async ({ answer }) => {
+  if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
+});
+
+socket.on('webrtc-ice', async ({ candidate }) => {
+  if (pc && candidate) {
+    try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e) {}
+  }
+});
+
+socket.on('chat-message', ({ from, name, role, message, timestamp }) => {
+  renderChatMessage(from === myId, name, role, message, timestamp);
+});
+
+socket.on('consultation-ended', ({ by, role }) => {
+  cleanupCall();
+  toast(`Consultation ended by ${role === 'doctor' ? 'Dr. ' : ''}${by}.`, 'warning');
+  setTimeout(() => goToLobby(), 1500);
+});
+
+socket.on('peer-disconnected', ({ name }) => {
+  toast(`${name} disconnected.`, 'error');
+  cleanupCall();
+  setTimeout(() => goToLobby(), 2000);
+});
+
+// ════════════════════════════════════════════════
+//  KEILE BUGRILE — DUMMY MEDICAL RECORD
+//  Submitted automatically when this patient joins
+// ════════════════════════════════════════════════
+const KEILE_RECORD = {
+  personal: {
+    fullName: 'Keile Bugrile',
+    dateOfBirth: '14 March 1992',
+    age: 33,
+    gender: 'Female',
+    idNumber: '9203140****083',
+    nationality: 'South African',
+    language: 'Zulu / English',
+    phone: '+27 82 456 7890',
+    address: 'Unit 4, 12 Tambotie Street, Mbombela, Mpumalanga, 1200'
+  },
+  vitals: {
+    bloodType: 'B+',
+    height: '164 cm',
+    weight: '68 kg',
+    bmi: '25.3 (Normal)',
+    bloodPressure: '122/80 mmHg',
+    heartRate: '76 bpm',
+    temperature: '36.7°C',
+    oxygenSaturation: '98%'
+  },
+  currentSymptoms: [
+    'Persistent dry cough — 6 days',
+    'Mild fever (37.8°C) — 3 days',
+    'Fatigue and body aches',
+    'Shortness of breath on exertion',
+    'Sore throat — 2 days'
+  ],
+  medicalHistory: [
+    { condition: 'Asthma (mild, intermittent)', diagnosed: '2008', status: 'Managed' },
+    { condition: 'Iron-deficiency anaemia', diagnosed: '2019', status: 'Treated' },
+    { condition: 'Appendectomy', diagnosed: '2015', status: 'Resolved (surgery)' }
+  ],
+  allergies: [
+    { substance: 'Penicillin', reaction: 'Hives, rash', severity: 'Moderate' },
+    { substance: 'Sulfonamides', reaction: 'Swelling, difficulty breathing', severity: 'Severe' }
+  ],
+  currentMedications: [
+    { name: 'Salbutamol (Ventolin) inhaler', dose: '100mcg', frequency: 'As needed' },
+    { name: 'Ferrous sulphate', dose: '200mg', frequency: 'Once daily' },
+    { name: 'Vitamin D3', dose: '1000 IU', frequency: 'Once daily' }
+  ],
+  familyHistory: [
+    'Father — Type 2 diabetes',
+    'Mother — Hypertension',
+    'Maternal grandmother — Breast cancer (age 68)'
+  ],
+  immunisations: [
+    { vaccine: 'COVID-19 (Pfizer)', date: 'October 2021 (2 doses)' },
+    { vaccine: 'Influenza', date: 'March 2024' },
+    { vaccine: 'Tetanus booster', date: 'January 2020' }
+  ],
+  lastVisit: {
+    date: '3 February 2025',
+    doctor: 'Dr. N. Dlamini (GP)',
+    reason: 'Annual check-up',
+    outcome: 'All vitals normal. Continued current medications.'
+  },
+  notes: 'Patient has a history of asthma — respiratory symptoms must be carefully evaluated to rule out asthma exacerbation vs. viral infection. Penicillin allergy is confirmed — avoid all beta-lactam antibiotics. Patient is generally compliant with medication.'
+};
+
+// ════════════════════════════════════════════════
+//  AUTH
+// ════════════════════════════════════════════════
+function selectRole(role) {
+  myRole = role;
+  document.getElementById('tab-patient').classList.toggle('active', role === 'patient');
+  document.getElementById('tab-doctor').classList.toggle('active', role === 'doctor');
+  document.getElementById('speciality-field').style.display = role === 'doctor' ? 'block' : 'none';
+}
+
+function joinSystem() {
+  const name = document.getElementById('auth-name').value.trim();
+  if (!name) { toast('Please enter your name.', 'error'); return; }
+  myName = name;
+
+  const speciality = myRole === 'doctor'
+    ? document.getElementById('auth-speciality').value
+    : null;
+
+  socket.emit('register', { role: myRole, name, speciality });
+
+  // If this patient is Keile Bugrile, automatically submit her medical record
+  if (myRole === 'patient' && name.toLowerCase().includes('keile')) {
+    socket.emit('submit-medical-record', { record: KEILE_RECORD });
+    console.log('Keile\'s medical record submitted to server.');
+  }
+
+  if (myRole === 'patient') {
+    document.getElementById('patient-greeting').textContent = `Hello, ${name} 👋`;
+    showPage('page-patient');
+  } else {
+    document.getElementById('doctor-greeting').textContent = `Dr. ${name}'s Dashboard`;
+    showPage('page-doctor');
+  }
+}
+
+// ════════════════════════════════════════════════
+//  PATIENT FLOW
+// ════════════════════════════════════════════════
+function renderDoctors(doctors) {
+  if (document.getElementById('page-patient').classList.contains('active')) {
+    const grid = document.getElementById('doctor-grid');
+    if (!doctors || doctors.length === 0) {
+      grid.innerHTML = `<div class="empty-state">
+        <div class="icon">🩺</div>
+        <p>No doctors available right now.<br/>Please wait or check back shortly.</p>
+      </div>`;
+      selectedDoctorId = null;
+      document.getElementById('selected-doctor-name').textContent = 'No doctor selected';
+      return;
+    }
+    grid.innerHTML = doctors.map(d => `
+      <div class="doctor-card ${selectedDoctorId === d.id ? 'selected' : ''}"
+           id="doc-${d.id}" onclick="selectDoctor('${d.id}', '${escHtml(d.name)}')">
+        <div class="doc-head">
+          <div class="avatar">${d.name.charAt(0).toUpperCase()}</div>
+          <div class="doc-info">
+            <div class="name">Dr. ${escHtml(d.name)}</div>
+            <div class="spec">${escHtml(d.speciality || 'General Practitioner')}</div>
+          </div>
+        </div>
+        <div class="avail-badge">Available now</div>
+      </div>
+    `).join('');
+  }
+}
+
+function selectDoctor(id, name) {
+  selectedDoctorId = id;
+  document.querySelectorAll('.doctor-card').forEach(c => c.classList.remove('selected'));
+  const el = document.getElementById(`doc-${id}`);
+  if (el) el.classList.add('selected');
+  document.getElementById('selected-doctor-name').textContent = `Dr. ${name} selected`;
+}
+
+function requestConsultation() {
+  if (!selectedDoctorId) { toast('Please select a doctor first.', 'error'); return; }
+  const symptoms = document.getElementById('symptoms-input').value.trim();
+  if (!symptoms) { toast('Please describe your symptoms.', 'error'); return; }
+  socket.emit('request-consultation', {
+    doctorId: selectedDoctorId,
+    patientName: myName,
+    symptoms
+  });
+}
+
+function cancelRequest() {
+  document.getElementById('waiting-overlay').classList.remove('active');
+  selectedDoctorId = null;
+}
+
+// ════════════════════════════════════════════════
+//  DOCTOR FLOW
+// ════════════════════════════════════════════════
+function toggleAvailability() {
+  const on = document.getElementById('avail-toggle').checked;
+  document.getElementById('avail-hint').textContent = on
+    ? 'Patients can now request consultations with you'
+    : "You're currently offline";
+  if (on) {
+    toast('You are now available for consultations.', 'success');
+  }
+}
+
+function acceptConsultation() {
+  document.getElementById('incoming-overlay').classList.remove('active');
+  currentPatientId = pendingPatientId;
+  socket.emit('accept-consultation', { patientId: pendingPatientId });
+}
+
+function declineConsultation() {
+  document.getElementById('incoming-overlay').classList.remove('active');
+  socket.emit('decline-consultation', { patientId: pendingPatientId });
+  pendingPatientId = null;
+}
+
+// ════════════════════════════════════════════════
+//  ROOM & WebRTC
+// ════════════════════════════════════════════════
+async function enterRoom(remoteName, remoteRole) {
+  peerName = remoteName;
+  showPage('page-room');
+
+  const initials = remoteName.charAt(0).toUpperCase();
+  document.getElementById('remote-avatar').textContent = initials;
+  document.getElementById('peer-avatar-side').textContent = initials;
+  document.getElementById('peer-name-side').textContent =
+    remoteRole === 'Doctor' ? `Dr. ${remoteName}` : remoteName;
+  document.getElementById('peer-role-side').textContent = remoteRole;
+
+  // Show "View Patient Record" button only for doctors
+  if (myRole === 'doctor') {
+    document.getElementById('record-btn').style.display = 'block';
+  } else {
+    document.getElementById('record-btn').style.display = 'none';
+  }
+
+  // Start local camera
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    document.getElementById('local-video').srcObject = localStream;
+  } catch(e) {
+    toast('Could not access camera/microphone. Check permissions.', 'error');
+    console.error(e);
+  }
+
+  startCallTimer();
+}
+
+async function ensurePeerConnection() {
+  if (pc) return;
+  const config = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
+  pc = new RTCPeerConnection(config);
+
+  if (localStream) {
+    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  }
+
+  pc.ontrack = (e) => {
+    const remoteVideo = document.getElementById('remote-video');
+    const placeholder = document.getElementById('video-placeholder');
+    if (e.streams && e.streams[0]) {
+      remoteVideo.srcObject = e.streams[0];
+      remoteVideo.style.display = 'block';
+      placeholder.style.display = 'none';
+    }
+  };
+
+  pc.onicecandidate = (e) => {
+    if (e.candidate) {
+      socket.emit('webrtc-ice', { roomId: currentRoomId, candidate: e.candidate });
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    console.log('WebRTC state:', pc.connectionState);
+    if (pc.connectionState === 'connected') {
+      document.getElementById('video-placeholder-text').textContent = 'Connected';
+    }
+  };
+}
+
+async function startCall() {
+  await ensurePeerConnection();
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  socket.emit('webrtc-offer', { roomId: currentRoomId, offer });
+}
+
+function toggleMic() {
+  micOn = !micOn;
+  if (localStream) {
+    localStream.getAudioTracks().forEach(t => t.enabled = micOn);
+  }
+  const btn = document.getElementById('mic-btn');
+  btn.classList.toggle('active', micOn);
+  btn.title = micOn ? 'Mute microphone' : 'Unmute microphone';
+}
+
+function toggleCam() {
+  camOn = !camOn;
+  if (localStream) {
+    localStream.getVideoTracks().forEach(t => t.enabled = camOn);
+  }
+  const btn = document.getElementById('cam-btn');
+  btn.classList.toggle('active', camOn);
+  btn.title = camOn ? 'Turn off camera' : 'Turn on camera';
+}
+
+async function toggleScreen() {
+  if (!screenSharing) {
+    try {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const screenTrack = screenStream.getVideoTracks()[0];
+      if (pc) {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(screenTrack);
+      }
+      document.getElementById('local-video').srcObject = screenStream;
+      screenTrack.onended = () => stopScreenShare();
+      screenSharing = true;
+      document.getElementById('screen-btn').classList.add('active');
+      toast('Screen sharing started.', 'success');
+    } catch(e) {
+      toast('Screen sharing cancelled.', 'warning');
+    }
+  } else {
+    stopScreenShare();
+  }
+}
+
+async function stopScreenShare() {
+  if (screenStream) {
+    screenStream.getTracks().forEach(t => t.stop());
+    screenStream = null;
+  }
+  screenSharing = false;
+  document.getElementById('screen-btn').classList.remove('active');
+  if (localStream && pc) {
+    const camTrack = localStream.getVideoTracks()[0];
+    const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+    if (sender && camTrack) sender.replaceTrack(camTrack);
+    document.getElementById('local-video').srcObject = localStream;
+  }
+  toast('Screen sharing stopped.', 'warning');
+}
+
+function endCall() {
+  socket.emit('end-consultation', { roomId: currentRoomId });
+  cleanupCall();
+  toast('Consultation ended.', 'warning');
+  setTimeout(() => goToLobby(), 1200);
+}
+
+function cleanupCall() {
+  stopCallTimer();
+  if (pc) { pc.close(); pc = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+  document.getElementById('remote-video').srcObject = null;
+  document.getElementById('remote-video').style.display = 'none';
+  document.getElementById('local-video').srcObject = null;
+  document.getElementById('video-placeholder').style.display = 'flex';
+  document.getElementById('chat-messages').innerHTML = '';
+  document.getElementById('notes-feed').innerHTML = '<div style="font-size:12px; color:var(--muted); text-align:center; padding:8px 0;">Notes sent here are visible to both doctor and patient.</div>';
+  currentRoomId = null;
+  micOn = true; camOn = true; screenSharing = false;
+  document.getElementById('mic-btn').classList.add('active');
+  document.getElementById('cam-btn').classList.add('active');
+  document.getElementById('screen-btn').classList.remove('active');
+}
+
+// ════════════════════════════════════════════════
+//  SHARED NOTES
+// ════════════════════════════════════════════════
+function sendNote() {
+  const input = document.getElementById('note-input');
+  const note = input.value.trim();
+  if (!note || !currentRoomId) return;
+  socket.emit('send-note', { roomId: currentRoomId, note });
+  input.value = '';
+}
+
+function noteKeydown(e) {
+  if (e.key === 'Enter') sendNote();
+}
+
+function renderNote(isMe, name, role, note, timestamp) {
+  const feed = document.getElementById('notes-feed');
+  const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const displayName = role === 'doctor' ? `Dr. ${name}` : name;
+  const roleClass = role === 'doctor' ? 'from-doctor' : 'from-patient';
+  const div = document.createElement('div');
+  div.className = `note-item ${roleClass}`;
+  div.innerHTML = `
+    <div class="note-meta">${escHtml(displayName)} · ${time}</div>
+    <div class="note-text">${escHtml(note)}</div>
+  `;
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+socket.on('shared-note', ({ from, name, role, note, timestamp }) => {
+  renderNote(from === myId, name, role, note, timestamp);
+});
+function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg || !currentRoomId) return;
+  socket.emit('chat-message', { roomId: currentRoomId, message: msg });
+  input.value = '';
+}
+
+function chatKeydown(e) {
+  if (e.key === 'Enter') sendChat();
+}
+
+function renderChatMessage(isMe, name, role, message, timestamp) {
+  const container = document.getElementById('chat-messages');
+  const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const displayName = role === 'doctor' ? `Dr. ${name}` : name;
+  const div = document.createElement('div');
+  div.className = `chat-msg ${isMe ? 'mine' : ''}`;
+  div.innerHTML = `
+    <div class="msg-meta">
+      <span class="sender">${escHtml(displayName)}</span>
+      <span>${time}</span>
+    </div>
+    <div class="bubble">${escHtml(message)}</div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+// ════════════════════════════════════════════════
+//  TIMER
+// ════════════════════════════════════════════════
+function startCallTimer() {
+  callSeconds = 0;
+  callTimerInterval = setInterval(() => {
+    callSeconds++;
+    const m = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+    const s = String(callSeconds % 60).padStart(2, '0');
+    document.getElementById('call-timer').textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+function stopCallTimer() {
+  clearInterval(callTimerInterval);
+  callTimerInterval = null;
+  callSeconds = 0;
+  document.getElementById('call-timer').textContent = '00:00';
+}
+
+// ════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goToLobby() {
+  if (myRole === 'patient') showPage('page-patient');
+  else showPage('page-doctor');
+}
+
+// ════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════
+function setConnStatus(online) {
+  document.getElementById('conn-dot').className = `dot ${online ? 'online' : ''}`;
+  document.getElementById('conn-status').textContent = online ? 'Connected' : 'Reconnecting…';
+}
+
+function toast(msg, type = 'info') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(20px)'; t.style.transition = '0.3s'; setTimeout(() => t.remove(), 300); }, 3500);
+}
+
+// ════════════════════════════════════════════════
+//  MEDICAL RECORD
+// ════════════════════════════════════════════════
+function requestMedicalRecord() {
+  const patientId = pendingPatientId || currentPatientId;
+  if (!patientId) { toast('No patient record available.', 'error'); return; }
+  socket.emit('request-medical-record', { patientId });
+  toast('Fetching patient record…', 'info');
+}
+
+socket.on('medical-record-response', ({ record, error }) => {
+  if (error) { toast(error, 'error'); return; }
+  renderMedicalRecord(record);
+});
+
+function renderMedicalRecord(r) {
+  const body = document.getElementById('record-body');
+  body.innerHTML = `
+    <div class="record-patient-head">
+      <div class="record-avatar">${r.personal.fullName.charAt(0)}</div>
+      <div class="record-patient-info">
+        <div class="r-name">${escHtml(r.personal.fullName)}</div>
+        <div class="r-sub">DOB: ${r.personal.dateOfBirth} &nbsp;·&nbsp; Age: ${r.personal.age} &nbsp;·&nbsp; ${r.personal.gender}</div>
+        <div class="r-sub">${r.personal.address}</div>
+        <div class="record-confidential">🔒 CONFIDENTIAL — Authorised access only</div>
+      </div>
+    </div>
+
+    <div class="record-section">
+      <div class="record-section-title">Personal Information</div>
+      ${row('ID Number', r.personal.idNumber)}
+      ${row('Nationality', r.personal.nationality)}
+      ${row('Language', r.personal.language)}
+      ${row('Phone', r.personal.phone)}
+    </div>
+
+    <div class="record-section">
+      <div class="record-section-title">Vital Statistics</div>
+      ${row('Blood Type', r.vitals.bloodType, 'warning')}
+      ${row('Height / Weight', r.vitals.height + ' / ' + r.vitals.weight)}
+      ${row('BMI', r.vitals.bmi)}
+      ${row('Blood Pressure', r.vitals.bloodPressure)}
+      ${row('Heart Rate', r.vitals.heartRate)}
+      ${row('Temperature', r.vitals.temperature)}
+      ${row('O₂ Saturation', r.vitals.oxygenSaturation)}
+    </div>
+
+    <div class="record-section">
+      <div class="record-section-title">Current Symptoms</div>
+      ${r.currentSymptoms.map(s => `
+        <div class="record-row"><span class="r-value">⚠ ${escHtml(s)}</span></div>
+      `).join('')}
+    </div>
+
+    <div class="record-section">
+      <div class="record-section-title">Allergies ⚠</div>
+      ${r.allergies.map(a => `
+        <div class="record-row">
+          <span class="r-label">${escHtml(a.substance)}</span>
+          <span class="r-value danger">${escHtml(a.reaction)} (${escHtml(a.severity)})</span>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="record-section">
+      <div class="record-section-title">Current Medications</div>
+      ${r.currentMedications.map(m => `
+        <div class="record-row">
+          <span class="r-label">${escHtml(m.name)}</span>
+          <span class="r-value">${escHtml(m.dose)} — ${escHtml(m.frequency)}</span>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="record-section">
+      <div class="record-section-title">Medical History</div>
+      ${r.medicalHistory.map(h => `
+        <div class="record-row">
+          <span class="r-label">${escHtml(h.condition)}</span>
+          <span class="r-value">${escHtml(h.diagnosed)} · ${escHtml(h.status)}</span>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="record-section">
+      <div class="record-section-title">Family History</div>
+      ${r.familyHistory.map(f => `
+        <div class="record-row"><span class="r-value">${escHtml(f)}</span></div>
+      `).join('')}
+    </div>
+
+    <div class="record-section">
+      <div class="record-section-title">Immunisations</div>
+      ${r.immunisations.map(i => `
+        <div class="record-row">
+          <span class="r-label">${escHtml(i.vaccine)}</span>
+          <span class="r-value">${escHtml(i.date)}</span>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="record-section">
+      <div class="record-section-title">Last Visit</div>
+      ${row('Date', r.lastVisit.date)}
+      ${row('Doctor', r.lastVisit.doctor)}
+      ${row('Reason', r.lastVisit.reason)}
+      ${row('Outcome', r.lastVisit.outcome)}
+    </div>
+
+    <div class="record-section">
+      <div class="record-section-title">Clinical Notes</div>
+      <div style="font-size:13px; color:var(--text); line-height:1.6; padding:8px 0;">${escHtml(r.notes)}</div>
+    </div>
+
+    <div class="access-notice">
+      🔒 This record was shared by the patient for this consultation only.<br/>
+      Access is restricted to the assigned doctor in this session.
+    </div>
+  `;
+  document.getElementById('record-modal').classList.add('active');
+}
+
+function row(label, value, cls = '') {
+  return `<div class="record-row">
+    <span class="r-label">${escHtml(label)}</span>
+    <span class="r-value ${cls}">${escHtml(value)}</span>
+  </div>`;
+}
+
+function closeRecordModal() {
+  document.getElementById('record-modal').classList.remove('active');
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
